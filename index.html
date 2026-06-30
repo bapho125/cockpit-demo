@@ -102,10 +102,19 @@
   .ctip .ctr{display:flex;align-items:center;gap:6px;margin-bottom:3px;white-space:nowrap}
   .ctip .ctr b{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:800}
   .optlab{font-size:10.5px;color:var(--mut2);font-weight:600}
-  .metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
-  .met{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
-  .met .mv{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
-  .met .ml{font-size:10.5px;color:var(--mut);font-weight:700;margin-top:3px}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px}
+  .met{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;cursor:pointer;transition:.12s}
+  .met:hover{border-color:var(--line2)}
+  .met.on{border-color:var(--acc);background:var(--panel2)}
+  .met .mvl{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+  .met .mv{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+  .met .msp{opacity:.85;flex-shrink:0}
+  .met .ml{font-size:10.5px;color:var(--mut);font-weight:700;margin-top:5px}
+  .agerow{display:grid;grid-template-columns:54px 1fr 34px;gap:9px;align-items:center;margin-bottom:8px;font-size:12px}
+  .agerow .num{text-align:right}
+  .agl{color:var(--mut);font-weight:700}
+  .gsplit{margin-top:13px}
+  .gbar{display:flex;height:18px;border-radius:6px;overflow:hidden}.gbar div{height:100%}
   .fpr{display:grid;grid-template-columns:92px 1fr 56px;gap:10px;align-items:center;margin-bottom:10px;font-size:12px}
   .fpr .num{text-align:right}
   .toprow{display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
@@ -175,9 +184,11 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const KEY='cockpit_v1';
+const KEY='cockpit_v2';
 const TODAY='2026-06-30';
 let view='cal', cur='all', editId=null, calRef=new Date(2026,5,1), sel=new Set();
+let detMetric='foll', detSort={k:'reach',dir:-1};
+const METRICS=[{k:'foll',label:'フォロワー'},{k:'reach',label:'リーチ'},{k:'saves',label:'保存'},{k:'sends',label:'シェア'},{k:'eng',label:'エンゲージ率',pct:true}];
 const u=p=>`https://images.unsplash.com/${p}?w=80&q=80`;
 
 let store=load();
@@ -189,15 +200,15 @@ function load(){
     {id:'a3',name:'つきうさぎ製菓',handle:'@tsukiusagi',color:'#FBBF24',avatar:u('photo-1486427944299-d1955d23e34d')},
   ];
   const P=[];let id=1;
-  const seed=(acct,arr)=>arr.forEach(([theme,fmt,when,posted,reach])=>P.push({id:id++,acct,theme,fmt,cap:'',when,posted,status:posted?'posted':(Math.random()<0?'rev':'sched'),reach:reach||0,saves:Math.round((reach||0)*0.06)}));
+  const seed=(acct,arr)=>arr.forEach(([theme,fmt,when,posted,reach])=>{const r=reach||0;P.push({id:id++,acct,theme,fmt,cap:'',when,posted,status:posted?'posted':'sched',reach:r,views:Math.round(r*1.7),saves:Math.round(r*0.07),sends:Math.round(r*0.045),nf:posted?46+(id%8)*2:0});});
   seed('a1',[['新作ラテの作り方','リール','2026-06-03T12:00',true,2750],['店内の様子','写真','2026-06-11T18:00',true,1250],['クロワッサンができるまで','リール','2026-06-18T08:00',true,3200],['雨の日のひとやすみ','カルーセル','2026-06-24T12:00',true,1650],['今週のおすすめ','リール','2026-07-01T12:00',false,0],['七夕限定メニュー','リール','2026-07-04T18:00',false,0]]);
   seed('a2',[['夏のヘアアレンジ','リール','2026-06-05T19:00',true,4100],['スタイリスト紹介','カルーセル','2026-06-12T12:00',true,1800],['新メニュー告知','写真','2026-06-20T18:00',true,1400],['お客様ビフォーアフター','リール','2026-06-27T19:00',true,5200],['7月キャンペーン','カルーセル','2026-07-02T12:00',false,0]]);
   seed('a3',[['焼き菓子の詰め合わせ','写真','2026-06-08T11:00',true,980],['季節のタルト','リール','2026-06-15T15:00',true,2200],['手土産にどうぞ','カルーセル','2026-06-22T11:00',true,1300],['夏ギフト予約開始','リール','2026-07-03T12:00',false,0]]);
-  // 確認待ちを少し
   P.filter(p=>!p.posted).slice(0,2).forEach(p=>p.status='rev');
-  const snap=(base,n)=>{const a=[];let f=base;for(let i=0;i<8;i++){a.push({d:`2026-0${5}-${('0'+(4+i*7)).slice(-2)}`.replace('-0','-0'),foll:Math.round(f)});f*=(1+ (0.012+ (n*0.004)));}return a;};
-  const mkSnaps=(base,rate)=>{const a=[],ds=['05-04','05-11','05-18','05-25','06-01','06-08','06-15','06-22'];let f=base;ds.forEach(d=>{a.push({d:'2026-'+d,foll:Math.round(f)});f*=rate;});return a;};
-  return {accounts:A,posts:P,snaps:{a1:mkSnaps(1062,1.028),a2:mkSnaps(3400,1.042),a3:mkSnaps(780,1.018)}};
+  const mkSnaps=(base,rate,rc0)=>{const a=[],ds=['05-04','05-11','05-18','05-25','06-01','06-08','06-15','06-22'];let f=base,rc=rc0;ds.forEach((d,i)=>{a.push({d:'2026-'+d,foll:Math.round(f),reach:Math.round(rc),saves:Math.round(rc*0.07),sends:Math.round(rc*0.045),eng:+(6.5+i*0.45+(rate>1.035?2.2:0)).toFixed(1),nf:44+i});f*=rate;rc*=(rate+0.012);});return a;};
+  const aud={a1:{age:[['18-24',24],['25-34',42],['35-44',22],['45-54',8],['55+',4]],gender:{f:61,m:39}},a2:{age:[['18-24',31],['25-34',45],['35-44',16],['45-54',6],['55+',2]],gender:{f:78,m:22}},a3:{age:[['18-24',15],['25-34',38],['35-44',28],['45-54',13],['55+',6]],gender:{f:67,m:33}}};
+  A.forEach(a=>a.audience=aud[a.id]);
+  return {accounts:A,posts:P,snaps:{a1:mkSnaps(1062,1.028,1800),a2:mkSnaps(3400,1.044,3200),a3:mkSnaps(780,1.018,1250)}};
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -228,26 +239,37 @@ function renderRail(){
 function setAcct(id){cur=id;clearSel();if(id!=='all')view='detail';else if(view==='detail')view='compare';document.querySelectorAll('.vtab').forEach(b=>b.classList.toggle('on',b.dataset.v===view));render();}
 function setView(v){view=v;clearSel();document.querySelectorAll('.vtab').forEach(b=>b.classList.toggle('on',b.dataset.v===v));render();}
 function render(){renderRail();const m=document.getElementById('main');if(view==='cal')renderCal(m);else if(view==='table')renderTable(m);else if(view==='compare')renderCompare(m);else renderDetail(m);}
-function metric(lab,val,color){return `<div class="met"><div class="mv"${color?` style="color:${color}"`:''}>${val}</div><div class="ml">${lab}</div></div>`;}
+function spark(vals,color){const W=78,H=22,mn=Math.min(...vals),mx=Math.max(...vals);const x=i=>i*W/(vals.length-1),y=v=>H-2-(mx===mn?H/2:(v-mn)/(mx-mn)*(H-4));return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block"><polyline points="${vals.map((v,i)=>x(i).toFixed(1)+','+y(v).toFixed(1)).join(' ')}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;}
+function setDetMetric(k){detMetric=k;render();}
+function sortDet(k){if(detSort.k===k)detSort.dir*=-1;else detSort={k,dir:-1};render();}
 function renderDetail(m){
   if(cur==='all'){m.innerHTML=`<div class="phd"><h1>アカウント詳細</h1><div class="sub">左のレールか「比較」表から、1アカウントを選ぶと深掘りできます。</div></div>`;return;}
-  const a=acctOf(cur),snaps=store.snaps[cur]||[],last=snaps.slice(-1)[0]||{foll:0},first=snaps[0]||{foll:0},mStart=snaps.find(s=>s.d>='2026-06-01')||first;
+  const a=acctOf(cur),snaps=store.snaps[cur]||[],mStart=snaps.find(s=>s.d>='2026-06-01')||snaps[0]||{};
   const posted=store.posts.filter(p=>p.acct===cur&&p.posted),up=store.posts.filter(p=>p.acct===cur&&!p.posted);
-  const avg=posted.length?posted.reduce((s,p)=>s+p.reach,0)/posted.length:0;
-  const reels=posted.filter(p=>p.fmt==='リール'),rPct=posted.length?Math.round(reels.length/posted.length*100):0;
-  const tot=posted.reduce((s,p)=>s+p.reach,0),savePct=tot?Math.round(posted.reduce((s,p)=>s+p.saves,0)/tot*100):0;
-  const fmts=['リール','カルーセル','写真'],fperf=fmts.map(f=>{const ps=posted.filter(p=>p.fmt===f);return {f,avg:ps.length?ps.reduce((s,p)=>s+p.reach,0)/ps.length:0,n:ps.length};});
-  const fmax=Math.max(1,...fperf.map(x=>x.avg)),bestF=fperf.slice().sort((p,q)=>q.avg-p.avg)[0];
-  const top=[...posted].sort((p,q)=>q.reach-p.reach).slice(0,4);
+  const sel=METRICS.find(x=>x.k===detMetric)||METRICS[0];
+  const cards=METRICS.map(mt=>{const vals=snaps.map(s=>s[mt.k]||0),lv=vals.slice(-1)[0]||0,sv=mStart[mt.k]||0,d=lv-sv;
+    return `<div class="met${detMetric===mt.k?' on':''}" onclick="setDetMetric('${mt.k}')"><div class="mvl"><div class="mv">${mt.pct?lv+'%':fmtNum(lv)}</div><div class="msp">${spark(vals,a.color)}</div></div><div class="ml">${mt.label} <span style="color:var(--green)">${d>=0?'+':''}${mt.pct?d.toFixed(1):fmtNum(d)}</span></div></div>`;}).join('');
+  const chart=lineChartRich([{name:sel.label,color:a.color,data:snaps.map(s=>({d:s.d,foll:s[sel.k]||0}))}]);
+  const au=a.audience||{age:[],gender:{f:50,m:50}},ageMax=Math.max(1,...au.age.map(x=>x[1]));
+  const ageBars=au.age.map(x=>`<div class="agerow"><div class="agl">${x[0]}</div><div class="barwrap"><div class="barseg" style="width:${(x[1]/ageMax*100).toFixed(0)}%;background:${a.color}"></div></div><div class="num" style="width:34px">${x[1]}%</div></div>`).join('');
+  const fmts=['リール','カルーセル','写真'],favg=f=>{const ps=posted.filter(p=>p.fmt===f);return ps.length?ps.reduce((s,p)=>s+p.reach,0)/ps.length:0;},fmax=Math.max(1,...fmts.map(favg));
+  const fperf=fmts.map(f=>`<div class="fpr"><div>${f}<span class="optlab"> ${posted.filter(p=>p.fmt===f).length}本</span></div><div class="barwrap"><div class="barseg" style="width:${(favg(f)/fmax*100).toFixed(0)}%;background:${a.color}"></div></div><div class="num">${fmtNum(favg(f))}</div></div>`).join('');
+  const bestF=fmts.slice().sort((p,q)=>favg(q)-favg(p))[0];
+  const cols=[['theme','テーマ'],['fmt','形式'],['reach','リーチ'],['views','視聴'],['saves','保存'],['sends','シェア'],['nf','非フォロワー']];
+  const thead=cols.map(([k,l])=>`<th onclick="sortDet('${k}')" style="cursor:pointer">${l}${detSort.k===k?(detSort.dir<0?' ▾':' ▴'):''}</th>`).join('');
+  const rows=posted.slice().sort((p,q)=>(p[detSort.k]>q[detSort.k]?1:p[detSort.k]<q[detSort.k]?-1:0)*detSort.dir).map(p=>`<tr onclick="openPost(${p.id})"><td>${esc(p.theme)}</td><td><span class="fmtb">${p.fmt}</span></td><td class="num">${fmtNum(p.reach)}</td><td class="num">${fmtNum(p.views)}</td><td class="num">${fmtNum(p.saves)}</td><td class="num">${fmtNum(p.sends)}</td><td class="num">${p.nf}%</td></tr>`).join('');
+  const topPost=posted.slice().sort((p,q)=>q.reach-p.reach)[0],sendsTrend=((snaps.slice(-1)[0]||{}).sends||0)-((snaps[0]||{}).sends||0);
+  const narr=`<b style="color:${a.color}">${bestF}</b>がリーチを牽引（平均${fmtNum(favg(bestF))}）。シェア(送信)は${sendsTrend>0?'増加傾向＝拡散が起きています':'横ばい'}。次は「${bestF}」を厚めに、保存・送りたくなる中身を意識。最も届いたのは「${topPost?esc(topPost.theme):'-'}」。`;
   m.innerHTML=`<div class="phd"><div class="aav" style="background-image:url('${a.avatar}');width:38px;height:38px"></div><div><h1>${esc(a.name)}</h1><div class="sub">${a.handle} ・ 投稿${posted.length}本 ・ 予約${up.length}件</div></div></div>
-   <div class="metrics">
-     ${metric('フォロワー',fmtNum(last.foll))}${metric('今月増','+'+fmtNum(last.foll-mStart.foll),'var(--green)')}${metric('平均リーチ',fmtNum(avg))}${metric('リール比率',rPct+'%')}${metric('投稿数',posted.length)}${metric('保存率',savePct+'%')}
+   <div class="metrics">${cards}</div>
+   <div class="card" style="margin-top:14px"><h3>${sel.label}の推移 <span class="optlab">— 指標カードをクリックで切替・グラフに触れると日付ごとの値</span></h3>${chart}</div>
+   <div class="cmpgrid" style="margin-top:14px;grid-template-columns:1fr 1fr">
+     <div class="card"><h3>オーディエンス</h3>${ageBars}<div class="gsplit"><div class="gbar"><div style="width:${au.gender.f}%;background:var(--pink)"></div><div style="width:${au.gender.m}%;background:var(--acc)"></div></div><div class="optlab" style="margin-top:7px">女性 ${au.gender.f}% ／ 男性 ${au.gender.m}%</div></div></div>
+     <div class="card"><h3>形式ごとの平均リーチ</h3><div class="bars">${fperf}</div><div class="optlab" style="margin-top:10px">「<b style="color:${a.color}">${bestF}</b>」が一番届いています。次はこの形式を増やすのが有効。</div></div>
    </div>
-   <div class="card" style="margin-top:16px"><h3>フォロワー推移 <span class="optlab">— グラフに触れると日付ごとの人数</span></h3>${lineChartRich([{name:a.name,color:a.color,data:snaps}])}</div>
-   <div class="cmpgrid" style="margin-top:16px;grid-template-columns:1fr 1fr">
-     <div class="card"><h3>形式ごとの平均リーチ</h3><div class="bars">${fperf.map(x=>`<div class="fpr"><div>${x.f}<span class="optlab"> ${x.n}本</span></div><div class="barwrap"><div class="barseg" style="width:${(x.avg/fmax*100).toFixed(0)}%;background:${a.color}"></div></div><div class="num">${fmtNum(x.avg)}</div></div>`).join('')}</div><div class="optlab" style="margin-top:10px">このアカウントは「<b style="color:${a.color}">${bestF.f}</b>」が一番届いています。次はこの形式を増やすのが有効。</div></div>
-     <div class="card"><h3>よく届いた投稿</h3>${top.map((p,i)=>`<div class="toprow" onclick="openPost(${p.id})"><span class="trk">${i+1}</span><div style="flex:1;min-width:0"><div class="trt">${esc(p.theme)}</div><div class="trm"><span class="fmtb">${p.fmt}</span> <b class="num">${fmtNum(p.reach)}</b> リーチ ・ 保存 ${fmtNum(p.saves)}</div></div></div>`).join('')||'<div class="optlab">投稿がありません</div>'}</div>
-   </div>`;
+   <div class="card" style="margin-top:14px"><h3>投稿パフォーマンス <span class="optlab">— 列をクリックで並べ替え・行で詳細</span></h3>
+     <table class="tbl" style="border:none;margin-top:4px"><thead><tr>${thead}</tr></thead><tbody>${rows||'<tr><td colspan="7" style="color:var(--mut)">投稿なし</td></tr>'}</tbody></table></div>
+   <div class="card" style="margin-top:14px"><h3>次の打ち手</h3><div style="font-size:13px;line-height:1.95">${narr}</div></div>`;
 }
 
 /* ---- cross-account calendar ---- */
@@ -307,10 +329,11 @@ function renderCompare(m){
     const snaps=store.snaps[a.id]||[],last=snaps.slice(-1)[0]||{foll:0},mStart=snaps.find(s=>s.d>='2026-06-01')||snaps[0]||{foll:0};
     const posted=store.posts.filter(p=>p.acct===a.id&&p.posted);
     const avg=posted.length?posted.reduce((s,p)=>s+p.reach,0)/posted.length:0;
+    const tr=posted.reduce((s,p)=>s+p.reach,0),sp=tr?Math.round(posted.reduce((s,p)=>s+p.saves,0)/tr*100):0,eng=(store.snaps[a.id]||[]).slice(-1)[0]||{};
     const reels=posted.filter(p=>p.fmt==='リール').length,rPct=posted.length?Math.round(reels/posted.length*100):0;
     return `<tr onclick="setAcct('${a.id}')" style="cursor:pointer"><td><span class="acell"><span class="adot" style="background:${a.color}"></span>${esc(a.name)} <span class="optlab">詳細›</span></span></td>
       <td class="num">${fmtNum(last.foll)}</td><td class="num" style="color:var(--green)">+${fmtNum(last.foll-mStart.foll)}</td>
-      <td class="num">${posted.length}</td><td class="num">${fmtNum(avg)}</td><td class="num">${rPct}%</td></tr>`;}).join('');
+      <td class="num">${posted.length}</td><td class="num">${fmtNum(avg)}</td><td class="num">${rPct}%</td><td class="num">${sp}%</td><td class="num">${eng.eng||'–'}%</td></tr>`;}).join('');
   // format mix bars
   const bars=store.accounts.map(a=>{
     const posted=store.posts.filter(p=>p.acct===a.id&&p.posted),t=posted.length||1;
@@ -320,7 +343,7 @@ function renderCompare(m){
   m.innerHTML=`<div class="phd"><h1>比較分析</h1><div class="sub">アカウント横断で、伸び・投稿量・形式を比べて次の配分を決める</div></div>
     <div class="cmpgrid">
       <div class="card"><h3>アカウント比較（今月）</h3>
-        <table class="cmptbl"><thead><tr><th>アカウント</th><th>フォロワー</th><th>今月増</th><th>投稿数</th><th>平均リーチ</th><th>リール比率</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+        <table class="cmptbl"><thead><tr><th>アカウント</th><th>フォロワー</th><th>今月増</th><th>投稿数</th><th>平均リーチ</th><th>リール比率</th><th>保存率</th><th>エンゲージ率</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="card"><h3>フォロワー推移の比較</h3>
         <div class="legrow">${store.accounts.map(a=>`<span><span class="adot" style="background:${a.color}"></span>${esc(a.name)}</span>`).join('')}</div>
         ${lineChartRich(store.accounts.map(a=>({name:a.name,color:a.color,data:store.snaps[a.id]||[]})))}</div>
