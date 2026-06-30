@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cockpit ｜ 複数アカウントSNS運用の司令塔</title>
+<style>
+  :root{
+    --bg:#0E1117; --panel:#161B24; --panel2:#1C2230; --panel3:#232B3B;
+    --line:#2A3343; --line2:#374256;
+    --ink:#E7EBF3; --mut:#8A93A6; --mut2:#5B6577;
+    --acc:#6366F1; --acc2:#818CF8; --teal:#2DD4BF; --green:#34D399; --amber:#FBBF24; --red:#F87171; --pink:#F472B6;
+    --sh:0 12px 36px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{overflow-x:clip}
+  body{font-family:"Inter","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:13px;line-height:1.5}
+  button{font-family:inherit}
+  /* topbar */
+  .top{display:flex;align-items:center;gap:18px;height:52px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;letter-spacing:.02em}
+  .brand .logo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--teal));display:flex;align-items:center;justify-content:center;font-size:14px}
+  .vtabs{display:flex;gap:4px;background:var(--panel2);padding:4px;border-radius:10px}
+  .vtab{border:none;background:none;color:var(--mut);font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:6px}
+  .vtab.on{background:var(--panel3);color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+  .gr{flex:1}
+  .kbd{font-size:10px;color:var(--mut2);border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-weight:700}
+  .btn{border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .btn.pri{background:var(--acc);color:#fff} .btn.pri:hover{background:#5458e0}
+  .btn.gho{background:var(--panel2);color:var(--ink);border:1px solid var(--line)} .btn.gho:hover{border-color:var(--line2)}
+  .btn.dng{background:transparent;color:var(--red);border:1px solid #4a2730} .btn.dng:hover{background:#2a1a1f}
+  /* layout */
+  .wrap{display:grid;grid-template-columns:248px 1fr;min-height:calc(100vh - 52px)}
+  .rail{background:var(--panel);border-right:1px solid var(--line);padding:14px 11px}
+  .rlab{font-size:10.5px;font-weight:800;color:var(--mut2);letter-spacing:.08em;text-transform:uppercase;margin:4px 6px 9px}
+  .acct{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;margin-bottom:3px;border:1px solid transparent}
+  .acct:hover{background:var(--panel2)}
+  .acct.on{background:var(--panel2);border-color:var(--line2)}
+  .adot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .aav{width:30px;height:30px;border-radius:9px;background-size:cover;background-position:center;flex-shrink:0;background:var(--panel3)}
+  .an{font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .am{font-size:10.5px;color:var(--mut);white-space:nowrap}
+  .awarn{margin-left:auto;color:var(--amber);font-size:11px;flex-shrink:0}
+  .acount{margin-left:auto;font-size:11px;color:var(--mut);font-weight:700;flex-shrink:0}
+  .main{padding:18px 22px 40px;min-width:0;overflow-x:auto}
+  .phd{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .phd h1{font-size:18px;font-weight:800}
+  .phd .sub{font-size:12px;color:var(--mut);font-weight:600}
+  /* calendar */
+  .calhd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .calhd b{font-size:14px}
+  .calhd button{border:none;background:var(--panel2);color:var(--ink);width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px}
+  .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .cdow{text-align:center;font-size:10.5px;color:var(--mut2);font-weight:800;padding-bottom:2px}
+  .ccell{min-height:84px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:6px;cursor:pointer;transition:.12s}
+  .ccell:hover{border-color:var(--line2)}
+  .ccell.pad{background:transparent;border-color:transparent;pointer-events:none}
+  .ccell.today{border-color:var(--acc)}
+  .cdn{font-size:11px;color:var(--mut);font-weight:700;margin-bottom:4px}
+  .cev{font-size:10px;font-weight:700;border-radius:5px;padding:2px 5px;margin-bottom:3px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:4px}
+  .cev .x{opacity:.65;font-size:9px}
+  .cleg{display:flex;gap:14px;flex-wrap:wrap;margin-top:11px;font-size:11px;color:var(--mut);font-weight:600}
+  .cleg span{display:flex;align-items:center;gap:6px}
+  /* table */
+  .tbar{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+  .tbl{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:12.5px}
+  .tbl th{text-align:left;font-size:10.5px;color:var(--mut2);font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:11px 12px;border-bottom:1px solid var(--line);background:var(--panel2);white-space:nowrap}
+  .tbl td{padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl tbody tr{cursor:pointer}
+  .tbl tbody tr:hover{background:var(--panel2)}
+  .tbl tr.sel{background:#1b2236}
+  .ck{width:16px;height:16px;accent-color:var(--acc);cursor:pointer;vertical-align:middle}
+  .acell{display:flex;align-items:center;gap:7px}
+  .chip{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;display:inline-block}
+  .st-posted{background:#16331f;color:var(--green)} .st-sched{background:#1e2550;color:var(--acc2)} .st-rev{background:#3a2e12;color:var(--amber)}
+  .fmtb{font-size:10.5px;font-weight:700;color:var(--mut);background:var(--panel3);padding:2px 7px;border-radius:6px}
+  .num{font-variant-numeric:tabular-nums;font-weight:700}
+  .bulkbar{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--panel3);border:1px solid var(--line2);border-radius:13px;box-shadow:var(--sh);padding:10px 12px;display:none;align-items:center;gap:10px;z-index:30}
+  .bulkbar.show{display:flex}
+  .bulkbar .n{font-weight:800;font-size:12.5px;padding-right:4px}
+  /* compare */
+  .cmpgrid{display:grid;grid-template-columns:1fr;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card h3{font-size:13px;font-weight:800;margin-bottom:13px;color:var(--ink)}
+  .cmptbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .cmptbl th{text-align:right;font-size:10px;color:var(--mut2);font-weight:800;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .cmptbl th:first-child{text-align:left}
+  .cmptbl td{padding:10px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+  .cmptbl td:first-child{text-align:left}
+  .cmptbl tr:last-child td{border-bottom:none}
+  .legrow{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:11.5px;font-weight:700}
+  .legrow span{display:flex;align-items:center;gap:6px}
+  .bars{display:flex;flex-direction:column;gap:9px}
+  .barrow{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center;font-size:12px}
+  .barwrap{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--panel2)}
+  .barseg{height:100%}
+  /* modal */
+  .ov{position:fixed;inset:0;background:rgba(5,8,14,.66);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+  .ov.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line2);border-radius:16px;width:100%;max-width:440px;padding:20px;box-shadow:var(--sh);max-height:92vh;overflow:auto}
+  .modal h3{font-size:16px;font-weight:800;margin-bottom:15px}
+  .f{margin-bottom:13px}
+  .f label{font-size:11px;color:var(--mut);font-weight:800;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em}
+  .f input,.f select,.f textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13px;font-family:inherit;color:var(--ink)}
+  .f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--acc)}
+  .frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .mfoot{display:flex;gap:9px;justify-content:flex-end;margin-top:8px}
+  .demo{font-size:10.5px;color:var(--mut2);text-align:center;padding:14px;font-weight:600}
+  .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--panel3);border:1px solid var(--line2);color:#fff;padding:10px 18px;border-radius:999px;font-size:12.5px;font-weight:700;opacity:0;transition:.25s;z-index:60;pointer-events:none}
+  .toast.show{opacity:1}
+  @media(max-width:760px){.wrap{grid-template-columns:1fr}.rail{display:none}.vtabs .vtab span.t{display:none}}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand"><span class="logo">◧</span>Cockpit</div>
+  <div class="vtabs" id="vtabs">
+    <button class="vtab on" data-v="cal" onclick="setView('cal')">📅 <span class="t">横断カレンダー</span></button>
+    <button class="vtab" data-v="table" onclick="setView('table')">▤ <span class="t">テーブル</span></button>
+    <button class="vtab" data-v="compare" onclick="setView('compare')">📊 <span class="t">比較</span></button>
+  </div>
+  <div class="gr"></div>
+  <span class="kbd">デモ・架空データ</span>
+  <button class="btn pri" onclick="openPost()">＋ 投稿</button>
+</div>
+<div class="wrap">
+  <aside class="rail" id="rail"></aside>
+  <main class="main" id="main"></main>
+</div>
+
+<div class="bulkbar" id="bulkbar">
+  <span class="n" id="bulkN">0件 選択中</span>
+  <button class="btn gho" onclick="bulkShift(7)">＋1週間 ずらす</button>
+  <button class="btn gho" onclick="bulkDup()">複製</button>
+  <button class="btn dng" onclick="bulkDel()">削除</button>
+  <button class="btn gho" onclick="clearSel()">解除</button>
+</div>
+
+<div class="ov" id="ov"><div class="modal">
+  <h3 id="mtitle">投稿を予約</h3>
+  <div class="f"><label>アカウント</label><select id="m_acct"></select></div>
+  <div class="f"><label>テーマ</label><input id="m_theme" placeholder="社内管理名"></div>
+  <div class="frow">
+    <div class="f"><label>形式</label><select id="m_fmt"><option>リール</option><option>カルーセル</option><option>写真</option><option>ストーリー</option></select></div>
+    <div class="f"><label>ステータス</label><select id="m_status"><option value="sched">予約済み</option><option value="rev">確認待ち</option><option value="posted">投稿済み</option></select></div>
+  </div>
+  <div class="f"><label>キャプション</label><textarea id="m_cap" rows="2" placeholder="本文"></textarea></div>
+  <div class="frow">
+    <div class="f"><label>日付</label><input type="date" id="m_date"></div>
+    <div class="f"><label>時刻</label><input type="time" id="m_time" value="19:00"></div>
+  </div>
+  <div class="mfoot"><button class="btn gho" onclick="closeOv()">キャンセル</button><button class="btn pri" id="m_save" onclick="savePost()">保存</button></div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY='cockpit_v1';
+const TODAY='2026-06-30';
+let view='cal', cur='all', editId=null, calRef=new Date(2026,5,1), sel=new Set();
+const u=p=>`https://images.unsplash.com/${p}?w=80&q=80`;
+
+let store=load();
+function load(){
+  const raw=localStorage.getItem(KEY);if(raw){try{return JSON.parse(raw);}catch(e){}}
+  const A=[
+    {id:'a1',name:'まちかど珈琲',handle:'@machikado.coffee',color:'#818CF8',avatar:u('photo-1447933601403-0c6688de566e')},
+    {id:'a2',name:'LUMI hair',handle:'@lumi.hair',color:'#2DD4BF',avatar:u('photo-1560066984-138dadb4c035')},
+    {id:'a3',name:'つきうさぎ製菓',handle:'@tsukiusagi',color:'#FBBF24',avatar:u('photo-1486427944299-d1955d23e34d')},
+  ];
+  const P=[];let id=1;
+  const seed=(acct,arr)=>arr.forEach(([theme,fmt,when,posted,reach])=>P.push({id:id++,acct,theme,fmt,cap:'',when,posted,status:posted?'posted':(Math.random()<0?'rev':'sched'),reach:reach||0,saves:Math.round((reach||0)*0.06)}));
+  seed('a1',[['新作ラテの作り方','リール','2026-06-03T12:00',true,2750],['店内の様子','写真','2026-06-11T18:00',true,1250],['クロワッサンができるまで','リール','2026-06-18T08:00',true,3200],['雨の日のひとやすみ','カルーセル','2026-06-24T12:00',true,1650],['今週のおすすめ','リール','2026-07-01T12:00',false,0],['七夕限定メニュー','リール','2026-07-04T18:00',false,0]]);
+  seed('a2',[['夏のヘアアレンジ','リール','2026-06-05T19:00',true,4100],['スタイリスト紹介','カルーセル','2026-06-12T12:00',true,1800],['新メニュー告知','写真','2026-06-20T18:00',true,1400],['お客様ビフォーアフター','リール','2026-06-27T19:00',true,5200],['7月キャンペーン','カルーセル','2026-07-02T12:00',false,0]]);
+  seed('a3',[['焼き菓子の詰め合わせ','写真','2026-06-08T11:00',true,980],['季節のタルト','リール','2026-06-15T15:00',true,2200],['手土産にどうぞ','カルーセル','2026-06-22T11:00',true,1300],['夏ギフト予約開始','リール','2026-07-03T12:00',false,0]]);
+  // 確認待ちを少し
+  P.filter(p=>!p.posted).slice(0,2).forEach(p=>p.status='rev');
+  const snap=(base,n)=>{const a=[];let f=base;for(let i=0;i<8;i++){a.push({d:`2026-0${5}-${('0'+(4+i*7)).slice(-2)}`.replace('-0','-0'),foll:Math.round(f)});f*=(1+ (0.012+ (n*0.004)));}return a;};
+  const mkSnaps=(base,rate)=>{const a=[],ds=['05-04','05-11','05-18','05-25','06-01','06-08','06-15','06-22'];let f=base;ds.forEach(d=>{a.push({d:'2026-'+d,foll:Math.round(f)});f*=rate;});return a;};
+  return {accounts:A,posts:P,snaps:{a1:mkSnaps(1062,1.028),a2:mkSnaps(3400,1.042),a3:mkSnaps(780,1.018)}};
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function fmtNum(n){return Math.round(n).toLocaleString('en-US');}
+function acctOf(id){return store.accounts.find(a=>a.id===id)||{name:'?',color:'#888',handle:''};}
+function visiblePosts(){return cur==='all'?store.posts:store.posts.filter(p=>p.acct===cur);}
+function statusLabel(s){return s==='posted'?'投稿済み':s==='rev'?'確認待ち':'予約済み';}
+function weekKey(w){const d=new Date(w.slice(0,10)+'T00:00');const o=(d.getDay()+6)%7;d.setDate(d.getDate()-o);return d.toISOString().slice(0,10);}
+
+/* ---- rail ---- */
+function renderRail(){
+  const r=document.getElementById('rail');
+  const total=store.posts.length;
+  let h=`<div class="rlab">アカウント</div>`;
+  h+=`<div class="acct ${cur==='all'?'on':''}" onclick="setAcct('all')"><span class="adot" style="background:linear-gradient(135deg,var(--acc),var(--teal))"></span><div style="min-width:0"><div class="an">全アカウント</div><div class="am">${store.accounts.length}件 ・ ${total}投稿</div></div></div>`;
+  h+=store.accounts.map(a=>{
+    const up=store.posts.filter(p=>p.acct===a.id&&!p.posted&&p.when.slice(0,10)>=TODAY);
+    const gap=up.length===0;
+    const foll=(store.snaps[a.id]||[]).slice(-1)[0]||{foll:0};
+    return `<div class="acct ${cur===a.id?'on':''}" onclick="setAcct('${a.id}')">
+      <div class="aav" style="background-image:url('${a.avatar}')"></div>
+      <div style="min-width:0;flex:1"><div class="an"><span class="adot" style="background:${a.color};margin-right:6px;display:inline-block"></span>${esc(a.name)}</div><div class="am">${fmtNum(foll.foll)} ・ 予約${up.length}</div></div>
+      ${gap?'<span class="awarn" title="この先の予約なし">⚠</span>':''}
+    </div>`;}).join('');
+  h+=`<div class="rlab" style="margin-top:18px">この先の抜け</div><div style="padding:0 6px;font-size:11.5px;color:var(--mut);line-height:1.8">${store.accounts.filter(a=>store.posts.filter(p=>p.acct===a.id&&!p.posted&&p.when.slice(0,10)>=TODAY).length===0).map(a=>`<div style="color:var(--amber)">⚠ ${esc(a.name)}：予約なし</div>`).join('')||'<span style="color:var(--green)">✓ 抜けはありません</span>'}</div>`;
+  r.innerHTML=h;
+}
+function setAcct(id){cur=id;clearSel();render();}
+function setView(v){view=v;clearSel();document.querySelectorAll('.vtab').forEach(b=>b.classList.toggle('on',b.dataset.v===v));render();}
+function render(){renderRail();const m=document.getElementById('main');if(view==='cal')renderCal(m);else if(view==='table')renderTable(m);else renderCompare(m);}
+
+/* ---- cross-account calendar ---- */
+function moveCal(n){calRef=new Date(calRef.getFullYear(),calRef.getMonth()+n,1);render();}
+function renderCal(m){
+  const y=calRef.getFullYear(),mo=calRef.getMonth();
+  const first=new Date(y,mo,1).getDay(),days=new Date(y,mo+1,0).getDate(),dows=['日','月','火','水','木','金','土'];
+  const posts=visiblePosts();
+  let cells=dows.map(d=>`<div class="cdow">${d}</div>`).join('');
+  for(let i=0;i<first;i++)cells+=`<div class="ccell pad"></div>`;
+  for(let d=1;d<=days;d++){
+    const ds=`${y}-${('0'+(mo+1)).slice(-2)}-${('0'+d).slice(-2)}`;
+    const evs=posts.filter(p=>p.when.slice(0,10)===ds);
+    const ev=evs.slice(0,3).map(p=>{const a=acctOf(p.acct);return `<div class="cev" style="background:${a.color}cc" title="${esc(a.name)}：${esc(p.theme)}" onclick="event.stopPropagation();openPost(${p.id})">${esc(p.theme)}<span class="x">${p.fmt[0]}</span></div>`;}).join('')+(evs.length>3?`<div class="cdn">+${evs.length-3}</div>`:'');
+    cells+=`<div class="ccell${ds===TODAY?' today':''}" onclick="openPostOn('${ds}')"><div class="cdn">${d}</div>${ev}</div>`;
+  }
+  m.innerHTML=`<div class="phd"><h1>横断カレンダー</h1><div class="sub">${cur==='all'?'全アカウントの予定を1画面で。色＝アカウント。':esc(acctOf(cur).name)+' のみ表示中'}</div></div>
+    <div class="calhd"><button onclick="moveCal(-1)">‹</button><b>${y}年 ${mo+1}月</b><button onclick="moveCal(1)">›</button></div>
+    <div class="cal">${cells}</div>
+    <div class="cleg">${store.accounts.map(a=>`<span><span class="adot" style="background:${a.color}"></span>${esc(a.name)}</span>`).join('')}</div>`;
+}
+
+/* ---- table + bulk ---- */
+function renderTable(m){
+  const posts=visiblePosts().slice().sort((a,b)=>a.when<b.when?1:-1);
+  const allSel=posts.length&&posts.every(p=>sel.has(p.id));
+  const rows=posts.map(p=>{const a=acctOf(p.acct),dt=new Date(p.when);
+    return `<tr class="${sel.has(p.id)?'sel':''}" onclick="rowClick(event,${p.id})">
+      <td><input type="checkbox" class="ck" ${sel.has(p.id)?'checked':''} onclick="event.stopPropagation();toggleSel(${p.id})"></td>
+      <td><span class="acell"><span class="adot" style="background:${a.color}"></span>${esc(a.name)}</span></td>
+      <td>${esc(p.theme)}</td>
+      <td><span class="fmtb">${p.fmt}</span></td>
+      <td class="num">${dt.getMonth()+1}/${dt.getDate()} ${('0'+dt.getHours()).slice(-2)}:${('0'+dt.getMinutes()).slice(-2)}</td>
+      <td><span class="chip st-${p.status}">${statusLabel(p.status)}</span></td>
+      <td class="num">${p.reach?fmtNum(p.reach):'–'}</td>
+      <td class="num">${p.saves?fmtNum(p.saves):'–'}</td>
+    </tr>`;}).join('');
+  m.innerHTML=`<div class="phd"><h1>投稿テーブル</h1><div class="sub">${posts.length}件 ・ 複数選択してまとめて操作（再スケジュール／複製／削除）</div></div>
+    <table class="tbl"><thead><tr>
+      <th><input type="checkbox" class="ck" ${allSel?'checked':''} onclick="toggleAll()"></th>
+      <th>アカウント</th><th>テーマ</th><th>形式</th><th>日時</th><th>状態</th><th>リーチ</th><th>保存</th>
+    </tr></thead><tbody>${rows||'<tr><td colspan="8" style="text-align:center;color:var(--mut);padding:30px">投稿がありません</td></tr>'}</tbody></table>`;
+  updateBulk();
+}
+function rowClick(e,id){openPost(id);}
+function toggleSel(id){sel.has(id)?sel.delete(id):sel.add(id);renderTable(document.getElementById('main'));}
+function toggleAll(){const posts=visiblePosts();const allSel=posts.every(p=>sel.has(p.id));if(allSel)posts.forEach(p=>sel.delete(p.id));else posts.forEach(p=>sel.add(p.id));renderTable(document.getElementById('main'));}
+function clearSel(){sel.clear();updateBulk();}
+function updateBulk(){const b=document.getElementById('bulkbar');b.classList.toggle('show',sel.size>0);document.getElementById('bulkN').textContent=`${sel.size}件 選択中`;}
+function bulkShift(days){store.posts.forEach(p=>{if(sel.has(p.id)){const d=new Date(p.when);d.setDate(d.getDate()+days);p.when=d.toISOString().slice(0,16);}});save();toast(`${sel.size}件を${days}日ずらしました`);render();}
+function bulkDup(){let id=Math.max(0,...store.posts.map(p=>p.id));const ids=[...sel];ids.forEach(x=>{const p=store.posts.find(q=>q.id===x);if(!p)return;id++;const d=new Date(p.when);d.setDate(d.getDate()+7);store.posts.push({...p,id,when:d.toISOString().slice(0,16),posted:false,status:'sched',reach:0,saves:0});});save();toast(`${ids.length}件を複製（翌週）`);clearSel();render();}
+function bulkDel(){const ids=[...sel];store.posts=store.posts.filter(p=>!sel.has(p.id));save();toast(`${ids.length}件を削除`);clearSel();render();}
+
+/* ---- compare ---- */
+function renderCompare(m){
+  const rowsHtml=store.accounts.map(a=>{
+    const snaps=store.snaps[a.id]||[],last=snaps.slice(-1)[0]||{foll:0},mStart=snaps.find(s=>s.d>='2026-06-01')||snaps[0]||{foll:0};
+    const posted=store.posts.filter(p=>p.acct===a.id&&p.posted);
+    const avg=posted.length?posted.reduce((s,p)=>s+p.reach,0)/posted.length:0;
+    const reels=posted.filter(p=>p.fmt==='リール').length,rPct=posted.length?Math.round(reels/posted.length*100):0;
+    return `<tr><td><span class="acell"><span class="adot" style="background:${a.color}"></span>${esc(a.name)}</span></td>
+      <td class="num">${fmtNum(last.foll)}</td><td class="num" style="color:var(--green)">+${fmtNum(last.foll-mStart.foll)}</td>
+      <td class="num">${posted.length}</td><td class="num">${fmtNum(avg)}</td><td class="num">${rPct}%</td></tr>`;}).join('');
+  // format mix bars
+  const bars=store.accounts.map(a=>{
+    const posted=store.posts.filter(p=>p.acct===a.id&&p.posted),t=posted.length||1;
+    const seg=f=>posted.filter(p=>p.fmt===f).length/t*100;
+    return `<div class="barrow"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span class="adot" style="background:${a.color};display:inline-block;margin-right:6px"></span>${esc(a.name)}</div>
+      <div class="barwrap"><div class="barseg" style="width:${seg('リール')}%;background:var(--acc)" title="リール"></div><div class="barseg" style="width:${seg('カルーセル')}%;background:var(--teal)" title="カルーセル"></div><div class="barseg" style="width:${seg('写真')}%;background:var(--amber)" title="写真"></div></div></div>`;}).join('');
+  m.innerHTML=`<div class="phd"><h1>比較分析</h1><div class="sub">アカウント横断で、伸び・投稿量・形式を比べて次の配分を決める</div></div>
+    <div class="cmpgrid">
+      <div class="card"><h3>アカウント比較（今月）</h3>
+        <table class="cmptbl"><thead><tr><th>アカウント</th><th>フォロワー</th><th>今月増</th><th>投稿数</th><th>平均リーチ</th><th>リール比率</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+      <div class="card"><h3>フォロワー推移の比較</h3>
+        <div class="legrow">${store.accounts.map(a=>`<span><span class="adot" style="background:${a.color}"></span>${esc(a.name)}</span>`).join('')}</div>
+        ${multiLine()}</div>
+      <div class="card"><h3>形式ミックスの比較</h3>
+        <div class="legrow"><span><span class="adot" style="background:var(--acc)"></span>リール</span><span><span class="adot" style="background:var(--teal)"></span>カルーセル</span><span><span class="adot" style="background:var(--amber)"></span>写真</span></div>
+        <div class="bars">${bars}</div></div>
+    </div>`;
+}
+function multiLine(){
+  const W=640,H=180,pad=14;
+  const all=store.accounts.map(a=>store.snaps[a.id]||[]);
+  const flat=all.flat().map(s=>s.foll),mn=Math.min(...flat),mx=Math.max(...flat),n=Math.max(...all.map(s=>s.length));
+  const x=i=>pad+i*(W-pad*2)/(n-1),y=v=>H-pad-(mx===mn?H/2:(v-mn)/(mx-mn)*(H-pad*2));
+  const lines=store.accounts.map(a=>{const s=store.snaps[a.id]||[];const pts=s.map((p,i)=>`${x(i).toFixed(1)},${y(p.foll).toFixed(1)}`).join(' ');return `<polyline points="${pts}" fill="none" stroke="${a.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${x(s.length-1).toFixed(1)}" cy="${y(s.slice(-1)[0].foll).toFixed(1)}" r="3.5" fill="${a.color}"/>`;}).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${lines}</svg>`;
+}
+
+/* ---- post modal ---- */
+function fillAcctSelect(v){document.getElementById('m_acct').innerHTML=store.accounts.map(a=>`<option value="${a.id}"${a.id===v?' selected':''}>${esc(a.name)}</option>`).join('');}
+function openPost(id){
+  const p=id?store.posts.find(x=>x.id===id):null;editId=p?p.id:null;
+  document.getElementById('mtitle').textContent=p?'投稿を編集':'投稿を予約';
+  document.getElementById('m_save').textContent=p?'更新':'保存';
+  fillAcctSelect(p?p.acct:(cur!=='all'?cur:store.accounts[0].id));
+  document.getElementById('m_theme').value=p?p.theme:'';
+  document.getElementById('m_cap').value=p?(p.cap||''):'';
+  document.getElementById('m_fmt').value=p?p.fmt:'リール';
+  document.getElementById('m_status').value=p?p.status:'sched';
+  if(p){const d=new Date(p.when);document.getElementById('m_date').value=d.toISOString().slice(0,10);document.getElementById('m_time').value=d.toTimeString().slice(0,5);}
+  else{document.getElementById('m_date').value=TODAY;document.getElementById('m_time').value='19:00';}
+  document.getElementById('ov').classList.add('show');
+}
+function openPostOn(ds){openPost();document.getElementById('m_date').value=ds;}
+function closeOv(){editId=null;document.getElementById('ov').classList.remove('show');}
+function savePost(){
+  const acct=document.getElementById('m_acct').value,theme=document.getElementById('m_theme').value.trim()||'（無題）',fmt=document.getElementById('m_fmt').value,
+    status=document.getElementById('m_status').value,cap=document.getElementById('m_cap').value,
+    when=document.getElementById('m_date').value+'T'+document.getElementById('m_time').value,posted=status==='posted';
+  if(editId){const p=store.posts.find(x=>x.id===editId);if(p)Object.assign(p,{acct,theme,fmt,status,cap,when,posted});}
+  else{const id=Math.max(0,...store.posts.map(p=>p.id))+1;store.posts.push({id,acct,theme,fmt,status,cap,when,posted,reach:0,saves:0});}
+  save();closeOv();toast('保存しました');render();
+}
+let tT;function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('show'),1900);}
+document.getElementById('ov').addEventListener('click',e=>{if(e.target.id==='ov')closeOv();});
+render();
+</script>
+</body>
+</html>
