@@ -95,6 +95,25 @@
   .barrow{display:grid;grid-template-columns:120px 1fr;gap:10px;align-items:center;font-size:12px}
   .barwrap{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--panel2)}
   .barseg{height:100%}
+  .chartwrap{position:relative;cursor:crosshair}
+  .cguide{position:absolute;top:0;bottom:18px;width:1.5px;background:var(--acc2);opacity:.55;display:none;pointer-events:none}
+  .ctip{position:absolute;top:2px;transform:translateX(-50%);background:var(--panel3);border:1px solid var(--line2);border-radius:9px;padding:8px 10px;display:none;pointer-events:none;font-size:11px;box-shadow:var(--sh);min-width:130px;z-index:5}
+  .ctip .ctd{font-size:10px;color:var(--mut);font-weight:800;margin-bottom:5px}
+  .ctip .ctr{display:flex;align-items:center;gap:6px;margin-bottom:3px;white-space:nowrap}
+  .ctip .ctr b{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:800}
+  .optlab{font-size:10.5px;color:var(--mut2);font-weight:600}
+  .metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+  .met{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+  .met .mv{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums}
+  .met .ml{font-size:10.5px;color:var(--mut);font-weight:700;margin-top:3px}
+  .fpr{display:grid;grid-template-columns:92px 1fr 56px;gap:10px;align-items:center;margin-bottom:10px;font-size:12px}
+  .fpr .num{text-align:right}
+  .toprow{display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+  .toprow:first-child{border-top:none}
+  .toprow:hover .trt{color:var(--acc2)}
+  .trk{width:22px;height:22px;border-radius:6px;background:var(--panel3);color:var(--acc2);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+  .trt{font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trm{font-size:11px;color:var(--mut);margin-top:2px}
   /* modal */
   .ov{position:fixed;inset:0;background:rgba(5,8,14,.66);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
   .ov.show{display:flex}
@@ -119,6 +138,7 @@
     <button class="vtab on" data-v="cal" onclick="setView('cal')">📅 <span class="t">横断カレンダー</span></button>
     <button class="vtab" data-v="table" onclick="setView('table')">▤ <span class="t">テーブル</span></button>
     <button class="vtab" data-v="compare" onclick="setView('compare')">📊 <span class="t">比較</span></button>
+    <button class="vtab" data-v="detail" onclick="setView('detail')">◐ <span class="t">アカウント詳細</span></button>
   </div>
   <div class="gr"></div>
   <span class="kbd">デモ・架空データ</span>
@@ -205,9 +225,30 @@ function renderRail(){
   h+=`<div class="rlab" style="margin-top:18px">この先の抜け</div><div style="padding:0 6px;font-size:11.5px;color:var(--mut);line-height:1.8">${store.accounts.filter(a=>store.posts.filter(p=>p.acct===a.id&&!p.posted&&p.when.slice(0,10)>=TODAY).length===0).map(a=>`<div style="color:var(--amber)">⚠ ${esc(a.name)}：予約なし</div>`).join('')||'<span style="color:var(--green)">✓ 抜けはありません</span>'}</div>`;
   r.innerHTML=h;
 }
-function setAcct(id){cur=id;clearSel();render();}
+function setAcct(id){cur=id;clearSel();if(id!=='all')view='detail';else if(view==='detail')view='compare';document.querySelectorAll('.vtab').forEach(b=>b.classList.toggle('on',b.dataset.v===view));render();}
 function setView(v){view=v;clearSel();document.querySelectorAll('.vtab').forEach(b=>b.classList.toggle('on',b.dataset.v===v));render();}
-function render(){renderRail();const m=document.getElementById('main');if(view==='cal')renderCal(m);else if(view==='table')renderTable(m);else renderCompare(m);}
+function render(){renderRail();const m=document.getElementById('main');if(view==='cal')renderCal(m);else if(view==='table')renderTable(m);else if(view==='compare')renderCompare(m);else renderDetail(m);}
+function metric(lab,val,color){return `<div class="met"><div class="mv"${color?` style="color:${color}"`:''}>${val}</div><div class="ml">${lab}</div></div>`;}
+function renderDetail(m){
+  if(cur==='all'){m.innerHTML=`<div class="phd"><h1>アカウント詳細</h1><div class="sub">左のレールか「比較」表から、1アカウントを選ぶと深掘りできます。</div></div>`;return;}
+  const a=acctOf(cur),snaps=store.snaps[cur]||[],last=snaps.slice(-1)[0]||{foll:0},first=snaps[0]||{foll:0},mStart=snaps.find(s=>s.d>='2026-06-01')||first;
+  const posted=store.posts.filter(p=>p.acct===cur&&p.posted),up=store.posts.filter(p=>p.acct===cur&&!p.posted);
+  const avg=posted.length?posted.reduce((s,p)=>s+p.reach,0)/posted.length:0;
+  const reels=posted.filter(p=>p.fmt==='リール'),rPct=posted.length?Math.round(reels.length/posted.length*100):0;
+  const tot=posted.reduce((s,p)=>s+p.reach,0),savePct=tot?Math.round(posted.reduce((s,p)=>s+p.saves,0)/tot*100):0;
+  const fmts=['リール','カルーセル','写真'],fperf=fmts.map(f=>{const ps=posted.filter(p=>p.fmt===f);return {f,avg:ps.length?ps.reduce((s,p)=>s+p.reach,0)/ps.length:0,n:ps.length};});
+  const fmax=Math.max(1,...fperf.map(x=>x.avg)),bestF=fperf.slice().sort((p,q)=>q.avg-p.avg)[0];
+  const top=[...posted].sort((p,q)=>q.reach-p.reach).slice(0,4);
+  m.innerHTML=`<div class="phd"><div class="aav" style="background-image:url('${a.avatar}');width:38px;height:38px"></div><div><h1>${esc(a.name)}</h1><div class="sub">${a.handle} ・ 投稿${posted.length}本 ・ 予約${up.length}件</div></div></div>
+   <div class="metrics">
+     ${metric('フォロワー',fmtNum(last.foll))}${metric('今月増','+'+fmtNum(last.foll-mStart.foll),'var(--green)')}${metric('平均リーチ',fmtNum(avg))}${metric('リール比率',rPct+'%')}${metric('投稿数',posted.length)}${metric('保存率',savePct+'%')}
+   </div>
+   <div class="card" style="margin-top:16px"><h3>フォロワー推移 <span class="optlab">— グラフに触れると日付ごとの人数</span></h3>${lineChartRich([{name:a.name,color:a.color,data:snaps}])}</div>
+   <div class="cmpgrid" style="margin-top:16px;grid-template-columns:1fr 1fr">
+     <div class="card"><h3>形式ごとの平均リーチ</h3><div class="bars">${fperf.map(x=>`<div class="fpr"><div>${x.f}<span class="optlab"> ${x.n}本</span></div><div class="barwrap"><div class="barseg" style="width:${(x.avg/fmax*100).toFixed(0)}%;background:${a.color}"></div></div><div class="num">${fmtNum(x.avg)}</div></div>`).join('')}</div><div class="optlab" style="margin-top:10px">このアカウントは「<b style="color:${a.color}">${bestF.f}</b>」が一番届いています。次はこの形式を増やすのが有効。</div></div>
+     <div class="card"><h3>よく届いた投稿</h3>${top.map((p,i)=>`<div class="toprow" onclick="openPost(${p.id})"><span class="trk">${i+1}</span><div style="flex:1;min-width:0"><div class="trt">${esc(p.theme)}</div><div class="trm"><span class="fmtb">${p.fmt}</span> <b class="num">${fmtNum(p.reach)}</b> リーチ ・ 保存 ${fmtNum(p.saves)}</div></div></div>`).join('')||'<div class="optlab">投稿がありません</div>'}</div>
+   </div>`;
+}
 
 /* ---- cross-account calendar ---- */
 function moveCal(n){calRef=new Date(calRef.getFullYear(),calRef.getMonth()+n,1);render();}
@@ -267,7 +308,7 @@ function renderCompare(m){
     const posted=store.posts.filter(p=>p.acct===a.id&&p.posted);
     const avg=posted.length?posted.reduce((s,p)=>s+p.reach,0)/posted.length:0;
     const reels=posted.filter(p=>p.fmt==='リール').length,rPct=posted.length?Math.round(reels/posted.length*100):0;
-    return `<tr><td><span class="acell"><span class="adot" style="background:${a.color}"></span>${esc(a.name)}</span></td>
+    return `<tr onclick="setAcct('${a.id}')" style="cursor:pointer"><td><span class="acell"><span class="adot" style="background:${a.color}"></span>${esc(a.name)} <span class="optlab">詳細›</span></span></td>
       <td class="num">${fmtNum(last.foll)}</td><td class="num" style="color:var(--green)">+${fmtNum(last.foll-mStart.foll)}</td>
       <td class="num">${posted.length}</td><td class="num">${fmtNum(avg)}</td><td class="num">${rPct}%</td></tr>`;}).join('');
   // format mix bars
@@ -282,20 +323,47 @@ function renderCompare(m){
         <table class="cmptbl"><thead><tr><th>アカウント</th><th>フォロワー</th><th>今月増</th><th>投稿数</th><th>平均リーチ</th><th>リール比率</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
       <div class="card"><h3>フォロワー推移の比較</h3>
         <div class="legrow">${store.accounts.map(a=>`<span><span class="adot" style="background:${a.color}"></span>${esc(a.name)}</span>`).join('')}</div>
-        ${multiLine()}</div>
+        ${lineChartRich(store.accounts.map(a=>({name:a.name,color:a.color,data:store.snaps[a.id]||[]})))}</div>
       <div class="card"><h3>形式ミックスの比較</h3>
         <div class="legrow"><span><span class="adot" style="background:var(--acc)"></span>リール</span><span><span class="adot" style="background:var(--teal)"></span>カルーセル</span><span><span class="adot" style="background:var(--amber)"></span>写真</span></div>
         <div class="bars">${bars}</div></div>
     </div>`;
 }
-function multiLine(){
-  const W=640,H=180,pad=14;
-  const all=store.accounts.map(a=>store.snaps[a.id]||[]);
-  const flat=all.flat().map(s=>s.foll),mn=Math.min(...flat),mx=Math.max(...flat),n=Math.max(...all.map(s=>s.length));
-  const x=i=>pad+i*(W-pad*2)/(n-1),y=v=>H-pad-(mx===mn?H/2:(v-mn)/(mx-mn)*(H-pad*2));
-  const lines=store.accounts.map(a=>{const s=store.snaps[a.id]||[];const pts=s.map((p,i)=>`${x(i).toFixed(1)},${y(p.foll).toFixed(1)}`).join(' ');return `<polyline points="${pts}" fill="none" stroke="${a.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${x(s.length-1).toFixed(1)}" cy="${y(s.slice(-1)[0].foll).toFixed(1)}" r="3.5" fill="${a.color}"/>`;}).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${lines}</svg>`;
+let CHART=null;
+function lineChartRich(series){
+  const W=680,H=210,padX=16,padY=20;
+  const all=series.flatMap(s=>s.data.map(p=>p.foll)),mn=Math.min(...all),mx=Math.max(...all);
+  const n=Math.max(...series.map(s=>s.data.length));
+  CHART={series,W,padX,n};
+  const x=i=>padX+i*(W-padX*2)/(n-1),y=v=>H-padY-(mx===mn?H/2:(v-mn)/(mx-mn)*(H-padY*2));
+  let grid='';for(let g=0;g<=3;g++){const gy=(padY+g*(H-padY*2)/3).toFixed(1);grid+=`<line x1="${padX}" y1="${gy}" x2="${W-padX}" y2="${gy}" stroke="#2A3343" stroke-width="1" stroke-dasharray="2 5"/>`;}
+  const single=series.length===1;
+  const area=single?`<defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${series[0].color}" stop-opacity=".28"/><stop offset="1" stop-color="${series[0].color}" stop-opacity="0"/></linearGradient></defs><polygon points="${padX},${H-padY} ${series[0].data.map((p,i)=>x(i).toFixed(1)+','+y(p.foll).toFixed(1)).join(' ')} ${W-padX},${H-padY}" fill="url(#ga)"/>`:'';
+  const lines=series.map(s=>{
+    const pts=s.data.map((p,i)=>`${x(i).toFixed(1)},${y(p.foll).toFixed(1)}`).join(' ');
+    const dots=s.data.map((p,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(p.foll).toFixed(1)}" r="${i===s.data.length-1?4:2.4}" fill="${s.color}"/>`).join('');
+    return `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>${dots}`;
+  }).join('');
+  const li=[0,Math.floor((n-1)/2),n-1];
+  const xl=li.map(i=>{const d=series[0].data[i];if(!d)return'';const dt=new Date(d.d);return `<text x="${x(i).toFixed(1)}" y="${H-4}" fill="#5B6577" font-size="9" text-anchor="middle">${dt.getMonth()+1}/${dt.getDate()}</text>`;}).join('');
+  const yl=`<text x="${padX}" y="${(y(mx)-5).toFixed(1)}" fill="#5B6577" font-size="9">${fmtNum(mx)}</text><text x="${padX}" y="${(y(mn)+11).toFixed(1)}" fill="#5B6577" font-size="9">${fmtNum(mn)}</text>`;
+  return `<div class="chartwrap" onmousemove="chHover(event)" onmouseleave="chHide()" ontouchstart="chHover(event)" ontouchmove="chHover(event)">
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${grid}${area}${lines}${xl}${yl}</svg>
+    <div class="cguide"></div><div class="ctip"></div></div>`;
 }
+function chHover(e){
+  if(!CHART)return;const wrap=e.currentTarget,r=wrap.getBoundingClientRect();
+  const cx=((e.touches&&e.touches[0]?e.touches[0].clientX:e.clientX)-r.left);
+  const {W,padX,n,series}=CHART;
+  let frac=(cx/r.width*W-padX)/(W-padX*2);frac=Math.max(0,Math.min(1,frac));
+  const i=Math.round(frac*(n-1)),xPx=(padX+i*(W-padX*2)/(n-1))/W*r.width;
+  const g=wrap.querySelector('.cguide'),t=wrap.querySelector('.ctip');
+  g.style.left=xPx+'px';g.style.display='block';
+  const d=series[0].data[i]?new Date(series[0].data[i].d):null;
+  t.innerHTML=`<div class="ctd">${d?(d.getMonth()+1)+'/'+d.getDate():''}</div>`+series.map(s=>s.data[i]?`<div class="ctr"><span class="adot" style="background:${s.color}"></span>${esc(s.name)}<b>${fmtNum(s.data[i].foll)}</b></div>`:'').join('');
+  t.style.left=Math.max(64,Math.min(r.width-64,xPx))+'px';t.style.display='block';
+}
+function chHide(){document.querySelectorAll('.cguide,.ctip').forEach(el=>el.style.display='none');}
 
 /* ---- post modal ---- */
 function fillAcctSelect(v){document.getElementById('m_acct').innerHTML=store.accounts.map(a=>`<option value="${a.id}"${a.id===v?' selected':''}>${esc(a.name)}</option>`).join('');}
